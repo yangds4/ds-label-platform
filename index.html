@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>房屋瑕疵标注平台</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --border:#e2e5ea; --text:#1f2329; --muted:#8a919f;
+  --primary:#2e6be6; --primary-l:#eaf1fe; --green:#1a9e6c; --green-l:#e6f7f0;
+  --red:#d64541; --red-l:#fdecec; --orange:#e8890c; --orange-l:#fdf3e3;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+header h1{font-size:17px;font-weight:600}
+header .spacer{flex:1}
+.badge{background:var(--primary-l);color:var(--primary);border-radius:12px;padding:3px 12px;font-size:13px}
+.tabs{display:flex;gap:4px;background:#eef0f3;border-radius:8px;padding:3px}
+.tab{border:none;background:transparent;color:var(--muted);padding:6px 16px;border-radius:6px;cursor:pointer;font-size:14px;transition:.15s}
+.tab.active{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600}
+.btn{border:1px solid var(--border);background:var(--panel);color:var(--text);padding:7px 16px;border-radius:6px;cursor:pointer;font-size:14px;transition:.15s}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{opacity:.88}
+.btn.green{background:var(--green);border-color:var(--green);color:#fff}
+.btn.green:hover{opacity:.88}
+.btn.warn{color:var(--orange);border-color:var(--orange)}
+.btn.warn:hover{color:var(--orange)}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.danger:hover{color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:4px 10px;font-size:12px}
+input,select{border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px}
+/* ===== 标注工作台 ===== */
+#annView{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+main{flex:1;display:flex;overflow:hidden}
+aside{width:260px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+aside .sfilter{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+aside .sfilter label{font-size:12px;color:var(--muted);margin-bottom:3px;display:block}
+aside .sfilter input, aside .sfilter select{width:100%;font-size:13px}
+aside .stabs{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+aside .stabs button{flex:1;border:none;background:var(--panel);padding:7px 0;font-size:13px;color:var(--muted);cursor:pointer;transition:.15s}
+aside .stabs button.active{background:var(--primary-l);color:var(--primary);font-weight:600}
+aside .stabs button:hover:not(.active){background:#f7f9fc}
+aside .head{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+aside .list{flex:1;overflow-y:auto}
+.titem{padding:9px 14px;border-bottom:1px solid #f0f1f4;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.titem:hover{background:#f7f9fc}
+.titem.active{background:var(--primary-l);border-right:3px solid var(--primary)}
+.titem .dot{width:8px;height:8px;border-radius:50%;background:#c9ced8;flex-shrink:0}
+.titem.done .dot{background:var(--green)}
+.titem.drafted .dot{background:var(--orange)}
+.titem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.titem.done .nm{color:var(--muted)}
+/* 全员标注：标注员分组头 */
+.ghead{padding:8px 14px;background:#f0f4fb;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--primary);cursor:pointer;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2}
+.ghead:hover{background:#e6eefc}
+.ghead .arrow{font-size:10px;transition:.15s;color:var(--muted)}
+.ghead.collapsed .arrow{transform:rotate(-90deg)}
+.ghead .gcnt{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted)}
+.loadmore{padding:8px 14px;text-align:center;font-size:12px;color:var(--primary);cursor:pointer;background:#fafbfe;border-bottom:1px solid #f0f1f4}
+.loadmore:hover{background:#eef3fc;text-decoration:underline}
+.img-area{flex:1;display:flex;flex-direction:column;background:#22262e;min-width:0}
+.img-area .info{padding:8px 16px;color:#aab2c0;font-size:13px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.img-area .info a{color:#7ea6f5}
+.img-box{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:grab}
+.img-box:active{cursor:grabbing}
+.img-box img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;transition:none}
+/* 缩放控制条 */
+.zoom-bar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);border-radius:20px;padding:5px 14px;color:#ccc;font-size:12px;z-index:5;pointer-events:auto}
+.zoom-bar button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:50%;width:26px;height:26px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.zoom-bar button:hover{background:rgba(255,255,255,.3)}
+.zoom-bar .pct{min-width:42px;text-align:center}
+.img-box .placeholder{color:#5a6272;font-size:15px}
+.panel{width:430px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.panel .phead{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.panel .phead .prog{font-size:13px;color:var(--muted)}
+.panel .items{flex:1;overflow-y:auto;padding:10px 16px}
+.cat{margin:12px 0 6px;font-size:13px;font-weight:600;color:var(--primary);border-left:3px solid var(--primary);padding-left:8px}
+.item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #eef0f3;gap:8px}
+.item .label{font-size:14px;flex:1}
+.opts{display:flex;gap:6px;flex-shrink:0}
+.opt{border:1px solid var(--border);background:#fff;border-radius:5px;padding:4px 12px;font-size:13px;cursor:pointer;user-select:none;transition:.12s}
+.opt:hover{border-color:var(--primary)}
+.opt.sel-yes{background:var(--red);border-color:var(--red);color:#fff}
+.opt.sel-no{background:var(--green);border-color:var(--green);color:#fff}
+.opt.sel-na{background:var(--orange);border-color:var(--orange);color:#fff}
+.pfoot{border-top:1px solid var(--border);padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.pfoot textarea{width:100%;height:52px;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;resize:none;font-family:inherit}
+.pfoot .row{display:flex;gap:10px;align-items:center}
+.savetip{font-size:12px;color:var(--muted)}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:#aab2c0;gap:14px}
+/* ===== 管理后台 ===== */
+#admView{display:none}
+.wrap{max-width:1200px;margin:24px auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px}
+.card h2{font-size:15px;margin-bottom:14px}
+.wrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:10px;border-bottom:1px solid #f0f1f4;vertical-align:middle}
+.tag{border-radius:10px;padding:2px 10px;font-size:12px}
+.tag.active{background:#e6f7f0;color:var(--green)}
+.tag.paused{background:#fdf3e3;color:var(--orange)}
+.tag.stopped{background:#fdecec;color:var(--red)}
+.bar{height:8px;background:#eef0f3;border-radius:4px;overflow:hidden;display:flex;width:160px}
+.bar .s{background:var(--green)} .bar .c{background:var(--orange)}
+.muted{color:var(--muted);font-size:12px}
+/* 标签统计卡片 */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:10px}
+.stat-card{background:#f8f9fb;border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center}
+.stat-card .sc-num{font-size:28px;font-weight:700;line-height:1.2}
+.stat-card .sc-num.c-red{color:var(--red)}
+.stat-card .sc-num.c-green{color:var(--green)}
+.stat-card .sc-num.c-orange{color:var(--orange)}
+.stat-card .sc-num.c-gray{color:var(--muted)}
+.stat-card .sc-label{font-size:12px;color:var(--muted);margin-top:4px}
+.label-stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:#fafbfc;border-radius:10px;border:1px solid var(--border);align-items:center}
+.label-stat-row .ls-name{font-size:14px;font-weight:600;color:var(--text);min-width:140px;flex-shrink:0}
+.label-stat-row .ls-item{text-align:center;min-width:70px}
+.label-stat-row .ls-val{font-size:20px;font-weight:700}
+.label-stat-row .ls-lbl{font-size:11px;color:var(--muted)}
+.c-red{color:var(--red)} .c-green{color:var(--green)} .c-orange{color:var(--orange)}
+/* 已提交数据查看 */
+.sub-detail{background:#fafbfc;border-radius:8px;padding:10px 14px}
+.sub-detail .ans-item{display:inline-flex;align-items:center;gap:4px;margin:3px 10px 3px 0;font-size:12px;background:#fff;border:1px solid var(--border);border-radius:5px;padding:3px 8px}
+.sub-detail .ans-item .av{font-weight:600}
+.sub-detail .ans-item .av.v-yes{color:var(--red)}
+.sub-detail .ans-item .av.v-no{color:var(--green)}
+.sub-detail .ans-item .av.v-na{color:var(--orange)}
+.pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:13px;color:var(--muted)}
+.mini-sel{padding:4px 6px;font-size:12px;border-radius:5px}
+/* ===== 公共 ===== */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99}
+.cardlogin{background:#fff;border-radius:12px;padding:32px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.cardlogin h2{font-size:18px;margin-bottom:18px}
+.cardlogin input{width:100%;border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:15px;margin-bottom:16px}
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 22px;border-radius:6px;font-size:14px;z-index:100;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 房屋瑕疵标注平台</h1>
+  <div class="tabs">
+    <button class="tab active" id="tabAnn" onclick="switchTab('ann')">标注工作台</button>
+    <button class="tab" id="tabAdm" onclick="switchTab('adm')">管理后台</button>
+  </div>
+  <span class="badge" id="userBadge"></span>
+  <span class="spacer"></span>
+  <span style="font-size:13px;color:var(--muted)" id="statTip"></span>
+  <button class="btn primary" id="claimBtn" onclick="claim()">领取任务</button>
+  <button class="btn" id="switchBtn" onclick="switchUser()">切换用户</button>
+</header>
+
+<!-- ============ 标注工作台 ============ -->
+<div id="annView">
+  <main>
+    <aside>
+      <div class="sfilter">
+        <label>标注员姓名</label>
+        <input id="sideName" placeholder="输入姓名" onkeydown="if(event.key==='Enter')switchSideUser()">
+        <label>选择批次</label>
+        <select id="sideBatch" onchange="loadTasks()">
+          <option value="">-- 请选择批次 --</option>
+        </select>
+        <div class="stabs">
+          <button id="tabAvail" onclick="switchSideTab('avail')" class="active">可选任务</button>
+          <button id="tabMine" onclick="switchSideTab('mine')">我的任务</button>
+          <button id="tabAll" onclick="switchSideTab('all')" style="display:none">全员标注</button>
+        </div>
+        <input id="sideSearch" placeholder="搜索字/段名称..." oninput="filterTaskList()">
+        <select id="sideAnnotatorFilter" style="display:none" onchange="filterAnnotatorTasks()">
+          <option value="">-- 全部标注员 --</option>
+        </select>
+      </div>
+      <div class="head"><span>我的任务</span><span id="listCount"></span></div>
+      <div class="list" id="taskList"></div>
+    </aside>
+    <div class="img-area" id="imgArea">
+      <div class="empty" id="emptyTip">
+        <div style="font-size:40px">📋</div>
+        <div>暂无任务，点击右上角「领取任务」开始标注</div>
+      </div>
+      <div class="info" id="imgInfo" style="display:none"></div>
+      <div class="img-box" id="imgBox" style="display:none"><img id="mainImg">
+        <div class="zoom-bar" id="zoomBar" style="display:none">
+          <button onclick="imgZoom('out')" title="缩小">−</button>
+          <span class="pct" id="zoomPct">100%</span>
+          <button onclick="imgZoom('in')" title="放大">+</button>
+          <button onclick="imgZoom('reset')" title="重置大小" style="margin-left:4px;width:22px;font-size:12px">⟲</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="panel" style="display:none">
+      <div class="phead">
+        <b style="font-size:15px">标注项</b>
+        <span class="prog" id="progTip"></span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn" style="padding:4px 10px;font-size:12px" onclick="fillAllNo()">未选项全部标「否」</button>
+      </div>
+      <div class="items" id="itemsBox"></div>
+      <div class="pfoot">
+        <textarea id="remark" placeholder="人工备注（选填）" oninput="scheduleDraft()"></textarea>
+        <div class="row">
+          <span class="savetip" id="saveTip"></span>
+          <span style="flex:1"></span>
+          <button class="btn warn" id="editBtn" onclick="startEdit()" style="display:none">✎ 修改标注</button>
+          <button class="btn primary" id="supervisorEditBtn" onclick="startSupervisorEdit()" style="display:none">✎ 修改并重新提交</button>
+          <button class="btn" onclick="gotoNext()">跳过</button>
+          <button class="btn green" id="submitBtn" onclick="submitTask()">提交本组</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div class="mask" id="loginMask" style="display:none">
+    <div class="cardlogin">
+      <h2>请输入你的姓名</h2>
+      <input id="nameInput" placeholder="例如：张三" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn primary" style="width:100%;padding:10px" onclick="doLogin()">开始标注</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 管理后台 ============ -->
+<div id="admView">
+  <div class="wrap">
+    <div class="card">
+      <h2>📥 导入 Excel 新建批次</h2>
+      <div class="wrow">
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+        <input id="batchName" placeholder="批次名称（选填）" style="width:220px">
+        <button class="btn primary" id="importBtn" onclick="doImport()">上传并导入</button>
+        <span class="muted">按 full_image_url 每张图一组；自动识别 full_image_url 之后的标注列</span>
+      </div>
+      <div id="importResult" class="muted" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="wrow" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">📦 批次管理</h2>
+        <button class="btn sm" onclick="loadBatches()">刷新</button>
+      </div>
+      <table>
+        <thead><tr><th>ID</th><th>名称</th><th>状态</th><th>进度（已交/进行中/总数）</th><th></th><th>操作</th></tr></thead>
+        <tbody id="batchBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="wrow" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">📊 标签统计</h2>
+        <div class="wrow">
+          <select id="statsBatch" onchange="loadLabelStats()"><option value="">选择批次...</option></select>
+          <button class="btn sm" onclick="loadLabelStats()">刷新统计</button>
+        </div>
+      </div>
+      <div id="statsOverview" class="stat-grid"></div>
+      <div id="statsDetail" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="wrow" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">📋 已提交数据</h2>
+        <div class="wrow">
+          <select id="subBatch" onchange="subPage=1;loadSubmitted()"><option value="">全部批次</option></select>
+          <input id="subAssignee" placeholder="按标注员筛选" style="width:120px" onkeydown="if(event.key==='Enter'){subPage=1;loadSubmitted()}">
+          <input id="subKw" placeholder="搜索房源/位置/URL" style="width:160px" onkeydown="if(event.key==='Enter'){subPage=1;loadSubmitted()}">
+          <button class="btn sm primary" onclick="subPage=1;loadSubmitted()">查询</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>任务#</th><th>批次</th><th>房源</th><th>位置</th><th>图片</th><th>是/否/无法判断</th><th>标注人</th><th>提交时间</th><th></th></tr></thead>
+        <tbody id="subBody"></tbody>
+      </table>
+      <div class="pager">
+        <span id="subInfo"></span>
+        <button class="btn sm" id="subPrev" onclick="subPage--;loadSubmitted()">上一页</button>
+        <button class="btn sm" id="subNext" onclick="subPage++;loadSubmitted()">下一页</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="wrow" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">👥 标注员进度与任务调配</h2>
+        <div class="wrow">
+          <select id="fltBatch" onchange="loadAnnotators()"><option value="">全部批次</option></select>
+          <button class="btn sm" onclick="loadAnnotators()">刷新</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>标注员</th><th>进行中</th><th>已提交</th><th>操作</th></tr></thead>
+        <tbody id="annBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let userName = localStorage.getItem('annotator_name') || '';
+let tasks = [], curTask = null, curDetail = null, answers = {}, draftTimer = null, dirty = false;
+let currentTab = 'ann', sideTab = 'mine', allBatches = [];
+let editingSubmitted = false; // 已提交任务的"修改模式"
+let isSupervisor = false;     // 主管：可查看全员标注
+let allGroups = {};           // 全员标注分组数据 { 标注员: [tasks] }
+let allGroupInfo = {};        // 每个标注员的真实总数与已加载数 { 标注员: {total, loaded} }
+let collapsedGroups = new Set(); // 已折叠的分组
+let groupRenderCount = {};    // 每个标注员当前已渲染的任务条数（懒加载，默认60）
+let supervisorEditing = false;   // 主管编辑他人任务模式
+
+// 当前任务是否属于他人（主管查看模式，强制只读）
+function isOthersTask(){
+  return curDetail && curDetail.assignee && curDetail.assignee !== userName;
+}
+function isReadonly(){
+  // 主管编辑他人任务时，允许编辑
+  if(isSupervisor && isOthersTask() && supervisorEditing) return false;
+  if(isOthersTask()) return true;
+  return curDetail && curDetail.status==='submitted' && !editingSubmitted;
+}
+
+// 检查是否为主管，控制「全员标注」标签显隐
+async function checkSupervisor(){
+  try{
+    const d = await api('/api/whoami?name='+encodeURIComponent(userName));
+    isSupervisor = d.isSupervisor;
+  }catch(e){ isSupervisor = false; }
+  $('tabAll').style.display = isSupervisor ? '' : 'none';
+  if(!isSupervisor && sideTab==='all'){ switchSideTab('mine'); }
+  if(isSupervisor) $('userBadge').textContent = '标注员：'+userName+'（主管）';
+}
+
+const $ = id => document.getElementById(id);
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+async function api(url, opts){
+  const r = await fetch(url, opts ? Object.assign({headers:{'Content-Type':'application/json'}}, opts) : undefined);
+  const j = await r.json().catch(()=>({ok:false,msg:'网络错误'}));
+  if(!j.ok) throw new Error(j.msg||'请求失败');
+  return j.data;
+}
+
+/* ===================== 标签切换 ===================== */
+function switchTab(t){
+  currentTab = t;
+  $('tabAnn').classList.toggle('active', t==='ann');
+  $('tabAdm').classList.toggle('active', t==='adm');
+  $('annView').style.display = t==='ann' ? 'flex' : 'none';
+  $('admView').style.display  = t==='adm' ? 'block' : 'none';
+  $('claimBtn').style.display = t==='ann' ? 'inline-block' : 'none';
+  $('switchBtn').style.display = t==='ann' ? 'inline-block' : 'none';
+  $('statTip').style.display = t==='ann' ? 'inline' : 'none';
+  if(t==='adm') refreshAll();
+  else if(userName) loadTasks();
+}
+
+/* ===================== 标注工作台 ===================== */
+function initUser(){
+  $('sideName').value = userName;
+  if(!userName){ $('loginMask').style.display='flex'; $('nameInput').focus(); }
+  else { $('userBadge').textContent = '标注员：'+userName; loadBatchesForSide(); loadTasks(); checkSupervisor(); }
+}
+function doLogin(){
+  const v = $('nameInput').value.trim();
+  if(!v) return toast('请输入姓名');
+  userName = v; localStorage.setItem('annotator_name', v);
+  $('loginMask').style.display='none';
+  $('userBadge').textContent = '标注员：'+userName;
+  $('sideName').value = userName;
+  loadBatchesForSide(); loadTasks(); checkSupervisor();
+}
+function switchSideUser(){
+  const v = $('sideName').value.trim();
+  if(!v) return toast('请输入姓名');
+  if(v !== userName){
+    userName = v; localStorage.setItem('annotator_name', v);
+    $('userBadge').textContent = '标注员：'+userName;
+  }
+  checkSupervisor().then(()=>loadTasks());
+  toast('已切换为：'+userName);
+}
+function switchUser(){ localStorage.removeItem('annotator_name'); location.reload(); }
+
+/* 左侧标签切换 */
+function switchSideTab(t){
+  sideTab = t;
+  $('tabAvail').classList.toggle('active', t==='avail');
+  $('tabMine').classList.toggle('active', t==='mine');
+  $('tabAll').classList.toggle('active', t==='all');
+  // 全员标注模式：显示标注员筛选下拉框
+  $('sideAnnotatorFilter').style.display = (t === 'all') ? '' : 'none';
+  loadTasks();
+}
+
+/* 加载左侧批次下拉 */
+async function loadBatchesForSide(){
+  try{
+    allBatches = await api('/api/admin/batches');
+    const sel = $('sideBatch');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">-- 全部批次 --</option>' +
+      allBatches.filter(b=>b.status==='active'||b.status==='paused').map(b=>`<option value="${b.id}">#${b.id} ${b.name}</option>`).join('');
+    sel.value = cur;
+  }catch(e){ /* 静默 */ }
+}
+
+/* 搜索过滤任务列表 */
+/* 搜索关键词过滤（在标注员筛选结果上二次过滤） */
+function applySearchFilter(){
+  const kw = $('sideSearch').value.trim().toLowerCase();
+  const items = $('taskList').querySelectorAll('.titem');
+  for(const el of items){
+    const text = el.querySelector('.nm')?.textContent?.toLowerCase() || '';
+    el.style.display = (!kw || text.includes(kw)) ? '' : 'none';
+  }
+}
+/* 兼容旧调用 */
+function filterTaskList(){ applySearchFilter(); }
+
+async function claim(){
+  try{
+    const d = await api('/api/claim',{method:'POST',body:JSON.stringify({name:userName,count:50})});
+    if(d.claimed===0) toast('暂无可领取的任务（批次可能已暂停或已领完）');
+    else toast('成功领取 '+d.claimed+' 组');
+    await loadTasks();
+  }catch(e){ toast(e.message); }
+}
+
+async function loadTasks(){
+  try{
+    const bid = $('sideBatch').value;
+    if(sideTab === 'all'){
+      // 主管：全员已提交，按标注员分组
+      groupRenderCount = {}; // 重新拉取数据后每组从头显示
+      const d = await api('/api/supervisor/all-submitted?name='+encodeURIComponent(userName)+(bid?'&batchId='+bid:''));
+      allGroups = d.groups;
+      allGroupInfo = d.groupInfo || {};
+      tasks = Object.values(allGroups).flat();
+      const annotatorCount = Object.keys(allGroups).length;
+      const totalInDb = d.totalInDb || tasks.length;
+      const tipParts = [];
+      tipParts.push(`全员已提交 ${totalInDb} 组`);
+      if(annotatorCount) tipParts.push(`${annotatorCount} 位标注员`);
+      if(d.perGroup && totalInDb > tasks.length){
+        tipParts.push(`（每页最多 ${d.perGroup} /人）`);
+      }
+      $('statTip').textContent = tipParts.join(' · ');
+      $('listCount').textContent = tasks.length + (totalInDb > tasks.length ? ` / 库内 ${totalInDb}` : '') + ' 条';
+      // 填充标注员筛选下拉框（用真实库内总数）
+      const afSel = $('sideAnnotatorFilter');
+      const curAf = afSel.value;
+      const names = Object.keys(allGroupInfo).sort();
+      afSel.innerHTML = '<option value="">-- 全部标注员 --</option>' +
+        names.map(n => `<option value="${n}">${n}（${allGroupInfo[n].total} 组${allGroupInfo[n].total > allGroupInfo[n].loaded ? '，已加载 '+allGroupInfo[n].loaded : ''}）</option>`).join('');
+      afSel.value = curAf;
+      renderAllList();
+      return;
+    }
+    if(sideTab === 'avail'){
+      // 可选任务：拉取该批次下 pending 的任务（最多200条预览）
+      tasks = await api('/api/available-tasks?batchId='+(bid||'')+'&limit=200');
+      $('statTip').textContent = `可选 ${tasks.length} 组`;
+    } else {
+      const d = await api('/api/my-tasks?name='+encodeURIComponent(userName)+(bid?'&batchId='+bid:''));
+      tasks = d.tasks;
+      $('statTip').textContent = `待标注 ${d.claimed} · 已提交 ${d.submitted}`;
+    }
+    $('listCount').textContent = (sideTab==='avail'?tasks.length:tasks.filter(t=>t.status==='claimed').length) + (sideTab==='avail'?' 可选':' 待做');
+    renderList();
+    if(sideTab === 'mine'){
+      const next = tasks.find(t=>t.status==='claimed');
+      if(next && (!curTask || curTask.status!=='claimed')) openTask(next.id);
+      else if(!tasks.length){ showEmpty(); }
+    }
+  }catch(e){ toast(e.message); }
+}
+
+/* 全员标注：按标注员分组渲染（可折叠 + 可筛选） */
+function renderAllList(){
+  const box = $('taskList');
+  box.innerHTML = '';
+  const names = Object.keys(allGroups);
+  const filterAnnotator = ($('sideAnnotatorFilter').value || '').trim(); // 空字符串=全部
+  if(!names.length){
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">暂无已提交的标注数据</div>';
+    $('listCount').textContent = '0 条';
+    return;
+  }
+  let visibleCount = 0;
+  for(const nm of names){
+    // 如果选了特定标注员，只渲染该人的数据
+    if(filterAnnotator && nm !== filterAnnotator) continue;
+    const list = allGroups[nm];
+    const collapsed = collapsedGroups.has(nm);
+    visibleCount += list.length;
+    const cap = groupRenderCount[nm] || 60; // 本次最多渲染条数（懒加载）
+    // 筛选模式下不显示分组头（只有一个人），直接平铺任务
+    if(!filterAnnotator){
+      const info = allGroupInfo[nm] || { total: list.length, loaded: list.length };
+      const cntLabel = info.loaded < info.total
+        ? `${info.loaded} / ${info.total} 组已提交`
+        : `${info.total} 组已提交`;
+      const gh = document.createElement('div');
+      gh.className = 'ghead' + (collapsed?' collapsed':'');
+      gh.innerHTML = `<span class="arrow">▼</span><span>👤 ${nm}${nm===userName?'（我）':''}</span><span class="gcnt">${cntLabel}</span>`;
+      gh.onclick = ()=>{
+        if(collapsedGroups.has(nm)) collapsedGroups.delete(nm); else collapsedGroups.add(nm);
+        renderAllList();
+      };
+      box.appendChild(gh);
+      if(collapsed) continue;
+    }
+    const shown = list.slice(0, cap);
+    for(const t of shown){
+      const div = document.createElement('div');
+      div.className = 'titem done' + (curTask&&curTask.id===t.id?' active':'');
+      div.dataset.assignee = nm; // 标记所属标注员
+      div.innerHTML = `<span class="dot"></span><span class="nm">#${t.id} ${t.cell_name||t.prospecting_id||'图片'}</span>` +
+        `<span style="font-size:11px;color:var(--muted)">${(t.submitted_at||'').slice(5,16)}</span>`;
+      div.onclick = ()=>openTask(t.id);
+      box.appendChild(div);
+    }
+    // 该组还有更多未渲染：加「加载更多」按钮
+    if(list.length > cap){
+      const more = document.createElement('div');
+      more.className = 'loadmore';
+      more.textContent = `▼ 加载更多（已显示 ${cap}/${list.length}）`;
+      more.onclick = ()=>{
+        groupRenderCount[nm] = cap + 60;
+        renderAllList();
+      };
+      box.appendChild(more);
+    }
+  }
+  // 更新计数：显示筛选后数量 / 库内真实总数
+  const totalInDb = Object.values(allGroupInfo).reduce((s, x) => s + (x.total || 0), 0);
+  const totalLoaded = Object.values(allGroups).flat().length;
+  $('listCount').textContent = filterAnnotator
+    ? `${visibleCount} / 库内 ${totalInDb} 条`
+    : (totalLoaded < totalInDb ? `${totalLoaded} / 库内 ${totalInDb} 条` : `${totalInDb} 条`);
+  // 搜索关键词二次过滤（在已按标注员筛选的基础上）
+  applySearchFilter();
+}
+
+/* 全员标注：按标注员筛选 */
+function filterAnnotatorTasks(){
+  groupRenderCount = {}; // 切换标注员后，每组从头显示
+  renderAllList();
+}
+
+function renderList(){
+  const box = $('taskList');
+  box.innerHTML = '';
+  const filtered = sideTab === 'avail' ? tasks : tasks;
+  for(const t of filtered){
+    const div = document.createElement('div');
+    const isAvail = sideTab === 'avail';
+    div.className = 'titem' + (curTask&&curTask.id===t.id?' active':'') + (isAvail?'':' '+ (t.status==='submitted'?' done':(t.has_draft?' drafted':'')));
+    const statusTag = isAvail
+      ? `<span style="font-size:11px;color:var(--primary)">待领取</span>`
+      : (t.status==='submitted'?'<span style="font-size:11px;color:var(--green)">已交</span>':'');
+    const subInfo = isAvail
+      ? `${t.img_count||1} 张图片`
+      : (t.status==='submitted'?'':(t.has_draft?'有草稿':''));
+    div.innerHTML = `<span class="dot"></span><span class="nm">${isAvail?(t.cell_name||t.prospecting_id||'图片'):'#'+t.id+' '+(t.cell_name||'图片')}</span>` +
+      `<span style="font-size:11px;color:var(--muted)">${subInfo}</span>${statusTag}`;
+    div.onclick = ()=> isAvail ? claimSingle(t.id) : openTask(t.id);
+    box.appendChild(div);
+  }
+  filterTaskList();
+}
+
+async function claimSingle(id){
+  try{
+    await api('/api/claim-single',{method:'POST',body:JSON.stringify({name:userName,taskId:id})});
+    toast('已领取');
+    sideTab = 'mine'; switchSideTab('mine');
+    loadTasks();
+  }catch(e){ toast(e.message); }
+}
+
+function showEmpty(){
+  $('emptyTip').style.display='flex'; $('imgInfo').style.display='none';
+  $('imgBox').style.display='none'; $('panel').style.display='none';
+  $('zoomBar').style.display='none';
+  curTask = null; editingSubmitted = false;
+}
+
+async function openTask(id){
+  try{
+    await flushDraft();
+    const t = await api('/api/task/'+id);
+    // 始终以 API 返回的最新数据为准（主管模式下本地 tasks 数组可能过期或不完整）
+    curTask = t;
+    curDetail = t;
+    editingSubmitted = false;
+    supervisorEditing = false;
+    answers = t.status==='submitted' ? (t.answers||{}) : (t.draft&&t.draft.answers ? t.draft.answers : {});
+    $('remark').value = t.status==='submitted' ? (t.remark||'') : (t.draft&&t.draft.remark||'');
+    $('emptyTip').style.display='none';
+    $('imgInfo').style.display='flex';
+    $('imgBox').style.display='flex';
+    $('panel').style.display='flex';
+    updateStatusInfo();
+    const img = $('mainImg');
+    imgScale = 1; imgX = 0; imgY = 0;
+    applyImgTransform();
+    imgRetryCount = 0;
+    img.onerror = onImgError;
+    img.onload = () => { imgRetryCount = 0; removeImgErrTip(); };
+    img.src = imgProxyUrl(t.full_image_url);
+    $('zoomBar').style.display = 'flex';
+    renderItems();
+    renderList();
+    updateEditUI();
+    $('saveTip').textContent = '';
+  }catch(e){ toast(e.message); }
+}
+
+function updateStatusInfo(){
+  const t = curDetail;
+  let statusHtml = '';
+  if(isOthersTask()){
+    if(isSupervisor && supervisorEditing){
+      statusHtml = '<span style="color:#f5b759">✎ 主管修改中（改完请点「重新提交」覆盖原标注）</span>';
+    } else {
+      statusHtml = `<span style="color:#7ea6f5">👁 ${t.assignee} 的标注（只读查看）</span>`;
+    }
+  } else if(t.status==='submitted'){
+    statusHtml = editingSubmitted
+      ? '<span style="color:#f5b759">✎ 修改中（改完请点「重新提交」）</span>'
+      : '<span style="color:#6fd3a7">✔ 已提交（点右下角「修改标注」可编辑）</span>';
+  }
+  $('imgInfo').innerHTML =
+    `<span>任务 #${t.id}</span><span>房源: ${t.prospecting_id||'-'}</span><span>位置: <b style="color:#fff">${t.cell_name||'-'}</b></span>`+
+    `<a href="${imgProxyUrl(t.full_image_url)}" target="_blank">原图链接 ↗</a>`+statusHtml;
+}
+
+/* 已提交任务：进入修改模式 / UI 状态刷新 */
+function startEdit(){
+  if(!curDetail || curDetail.status!=='submitted' || isOthersTask()) return;
+  editingSubmitted = true;
+  updateStatusInfo();
+  renderItems();
+  updateEditUI();
+  toast('已进入修改模式，改完点「重新提交」');
+}
+/* 主管：进入编辑他人任务模式 */
+function startSupervisorEdit(){
+  if(!curDetail || !isOthersTask() || curDetail.status!=='submitted' || !isSupervisor) return;
+  supervisorEditing = true;
+  updateStatusInfo();
+  renderItems();
+  updateEditUI();
+  toast('已进入主管修改模式，改完点「重新提交」覆盖原标注');
+}
+function updateEditUI(){
+  const submitted = curDetail && curDetail.status==='submitted';
+  const others = isOthersTask();
+  // 自己的已提交：显示"修改标注"按钮
+  $('editBtn').style.display = (submitted && !editingSubmitted && !others) ? 'inline-block' : 'none';
+  // 主管查看他人已提交：显示"修改并重新提交"按钮
+  $('supervisorEditBtn').style.display = (isSupervisor && others && submitted && !supervisorEditing) ? 'inline-block' : 'none';
+  $('submitBtn').disabled = isReadonly();
+  $('submitBtn').style.display = others && !isSupervisor ? 'none' : 'inline-block';
+  if(isSupervisor && others && supervisorEditing){
+    $('submitBtn').textContent = '重新提交';
+    $('submitBtn').classList.remove('green');
+    $('submitBtn').classList.add('primary');
+  } else if(submitted && editingSubmitted){
+    $('submitBtn').textContent = '重新提交';
+    $('submitBtn').classList.remove('green');
+    $('submitBtn').classList.add('primary');
+  } else {
+    $('submitBtn').textContent = '提交本组';
+    $('submitBtn').classList.remove('primary');
+    $('submitBtn').classList.add('green');
+  }
+  $('remark').readOnly = isReadonly();
+}
+
+function renderItems(){
+  const cols = curDetail.label_columns;
+  const box = $('itemsBox');
+  box.innerHTML = '';
+  const readonly = isReadonly();
+  let lastCat = null;
+  for(const col of cols){
+    const idx = col.indexOf('_');
+    const cat = idx>0 ? col.slice(0,idx) : '其他';
+    const name = idx>0 ? col.slice(idx+1) : col;
+    if(cat!==lastCat){
+      const c = document.createElement('div'); c.className='cat'; c.textContent=cat; box.appendChild(c);
+      lastCat = cat;
+    }
+    const item = document.createElement('div'); item.className='item';
+    const optHtml = ['是','否','无法判断'].map(o=>{
+      const cls = answers[col]===o ? (o==='是'?'sel-yes':o==='否'?'sel-no':'sel-na') : '';
+      return `<span class="opt ${cls}" data-col="${col}" data-val="${o}">${o}</span>`;
+    }).join('');
+    item.innerHTML = `<span class="label">${name}</span><div class="opts">${optHtml}</div>`;
+    box.appendChild(item);
+  }
+  if(!readonly){
+    box.querySelectorAll('.opt').forEach(el=>{
+      el.onclick = ()=>{
+        const col = el.dataset.col, val = el.dataset.val;
+        answers[col] = answers[col]===val ? undefined : val;
+        if(answers[col]===undefined) delete answers[col];
+        renderItems(); scheduleDraft();
+      };
+    });
+  }
+  updateProg();
+}
+
+function updateProg(){
+  const total = curDetail.label_columns.length;
+  const done = curDetail.label_columns.filter(c=>answers[c]).length;
+  $('progTip').textContent = `${done}/${total}`;
+  $('progTip').style.color = done===total ? 'var(--green)' : 'var(--muted)';
+}
+
+function fillAllNo(){
+  if(isReadonly()) return;
+  for(const c of curDetail.label_columns) if(!answers[c]) answers[c]='否';
+  renderItems(); scheduleDraft();
+}
+
+function scheduleDraft(){
+  if(isReadonly()) return;
+  // 已提交任务的修改 / 主管覆盖不走草稿（改动在内存中，点提交生效）
+  if(curDetail && curDetail.status==='submitted'){
+    $('saveTip').textContent = '有未提交的修改，点「重新提交」保存';
+    return;
+  }
+  dirty = true;
+  $('saveTip').textContent = '编辑中…';
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(flushDraft, 1000);
+}
+async function flushDraft(){
+  if(!dirty || !curTask || !curDetail || curDetail.status==='submitted') return;
+  clearTimeout(draftTimer);
+  dirty = false;
+  try{
+    await api('/api/task/'+curDetail.id+'/draft',{method:'POST',body:JSON.stringify({name:userName,draft:{answers,remark:$('remark').value}})});
+    $('saveTip').textContent = '草稿已保存 '+new Date().toLocaleTimeString();
+  }catch(e){ $('saveTip').textContent = '草稿保存失败：'+e.message; }
+}
+
+async function submitTask(){
+  if(!curDetail || isReadonly()) return;
+  const missing = curDetail.label_columns.filter(c=>!answers[c]);
+  if(missing.length) return toast('还有 '+missing.length+' 项未标注');
+  // 主管覆盖他人提交
+  const isSupervisorResubmit = isSupervisor && isOthersTask() && supervisorEditing;
+  const wasResubmit = curDetail.status==='submitted' && editingSubmitted;
+  try{
+    if(isSupervisorResubmit){
+      await api('/api/task/'+curDetail.id+'/supervisor-resubmit',{method:'POST',body:JSON.stringify({name:userName,answers,remark:$('remark').value})});
+      toast('主管修改已覆盖原标注 ✔');
+      supervisorEditing = false;
+      curDetail.answers = {...answers};
+      curDetail.remark = $('remark').value;
+      updateStatusInfo();
+      renderItems();
+      renderList();
+      updateEditUI();
+      $('saveTip').textContent = '';
+      return;
+    }
+    await api('/api/task/'+curDetail.id+'/submit',{method:'POST',body:JSON.stringify({name:userName,answers,remark:$('remark').value})});
+    toast(wasResubmit ? '修改已保存，重新提交成功 ✔' : '提交成功 ✔');
+    dirty = false;
+    editingSubmitted = false;
+    const d = await api('/api/my-tasks?name='+encodeURIComponent(userName));
+    tasks = d.tasks;
+    $('statTip').textContent = `待标注 ${d.claimed} · 已提交 ${d.submitted}`;
+    if(wasResubmit){
+      // 重新提交后停留在当前任务（回到只读态）
+      curDetail.status = 'submitted';
+      updateStatusInfo();
+      renderItems();
+      renderList();
+      updateEditUI();
+      $('saveTip').textContent = '';
+    } else {
+      gotoNext();
+    }
+  }catch(e){ toast(e.message); }
+}
+
+function gotoNext(){
+  const next = tasks.find(t=>t.status==='claimed' && (!curDetail || t.id!==curDetail.id));
+  if(next) openTask(next.id);
+  else { renderList(); showEmpty(); toast('本轮任务已全部完成，可继续领取'); }
+}
+
+/* ===================== 管理后台 ===================== */
+async function doImport(){
+  const f = $('fileInput').files[0];
+  if(!f) return toast('请先选择 Excel 文件');
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('batchName', $('batchName').value);
+  $('importBtn').disabled = true;
+  $('importResult').textContent = '导入中，请稍候…（1万+行约需十几秒）';
+  try{
+    const r = await fetch('/api/admin/import', {method:'POST', body:fd});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.msg);
+    $('importResult').innerHTML = `✅ 导入成功：批次「${j.data.batchName}」，共 <b>${j.data.totalTasks}</b> 组（${j.data.totalRows} 行），标注列 ${j.data.labelColumns.length} 项：${j.data.labelColumns.join('、')}`;
+    $('fileInput').value=''; $('batchName').value='';
+    refreshAll();
+  }catch(e){ $('importResult').textContent = '❌ '+e.message; }
+  $('importBtn').disabled = false;
+}
+
+async function loadBatches(){
+  try{
+    const list = await api('/api/admin/batches');
+    const body = $('batchBody');
+    body.innerHTML = list.length ? '' : '<tr><td colspan="6" class="muted">暂无批次，请先导入 Excel</td></tr>';
+    const sel = $('fltBatch');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">全部批次</option>' + list.map(b=>`<option value="${b.id}">#${b.id} ${b.name}</option>`).join('');
+    sel.value = cur;
+    allBatchesAdmin = list; // 供统计下拉使用
+    // 同步「已提交数据」批次下拉
+    const subSel = $('subBatch');
+    if(subSel){
+      const subCur = subSel.value;
+      subSel.innerHTML = '<option value="">全部批次</option>' + list.map(b=>`<option value="${b.id}">#${b.id} ${b.name}</option>`).join('');
+      if(subCur && list.find(b=>b.id==subCur)) subSel.value = subCur;
+    }
+    // 同步统计下拉
+    const sSel = $('statsBatch');
+    if(sSel){
+      const sCur = sSel.value;
+      sSel.innerHTML = '<option value="">选择批次...</option>' + list.map(b=>`<option value="${b.id}">#${b.id} ${b.name}</option>`).join('');
+      if(sCur && list.find(b=>b.id==sCur)) sSel.value = sCur;
+      else {
+        const active = list.find(b=>b.status==='active');
+        if(active) { sSel.value = active.id; loadLabelStats(); }
+      }
+    }
+    for(const b of list){
+      const total = b.total_tasks, sub = b.submitted, cl = b.claimed;
+      const stTag = {active:'<span class="tag active">进行中</span>',paused:'<span class="tag paused">已暂停</span>',stopped:'<span class="tag stopped">已停止</span>'}[b.status];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${b.id}</td><td>${b.name}<div class="muted">${b.source_file||''}</div></td><td>${stTag}</td>
+        <td><div class="bar"><div class="s" style="width:${total?sub/total*100:0}%"></div><div class="c" style="width:${total?cl/total*100:0}%"></div></div></td>
+        <td class="muted">${sub} / ${cl} / ${total}</td>
+        <td>
+          ${b.status==='active'?`<button class="btn sm warn" onclick="setStatus(${b.id},'paused')">暂停</button>`:''}
+          ${b.status==='paused'?`<button class="btn sm green" onclick="setStatus(${b.id},'active')">恢复</button>`:''}
+          ${b.status!=='stopped'?`<button class="btn sm danger" onclick="stopBatch(${b.id})">停止</button>`:`<button class="btn sm green" onclick="setStatus(${b.id},'active')">重新启用</button>`}
+          <button class="btn sm" onclick="releaseBatch(${b.id})">释放未交组</button>
+          <select class="mini-sel" id="expSel${b.id}" title="导出范围">
+            <option value="all">全部数据</option>
+            <option value="submitted">仅已提交</option>
+            <option value="unsubmitted">仅未提交</option>
+          </select>
+          <button class="btn sm primary" onclick="exportBatch(${b.id})">导出</button>
+          <button class="btn sm danger" onclick='deleteBatch(${b.id}, ${JSON.stringify(b.name||"")}, ${total}, ${sub})'>🗑 删除</button>
+        </td>`;
+      body.appendChild(tr);
+    }
+  }catch(e){ toast(e.message); }
+}
+
+async function setStatus(id, status){
+  try{ await api(`/api/admin/batches/${id}/status`,{method:'POST',body:JSON.stringify({status})}); toast('已更新'); loadBatches(); }
+  catch(e){ toast(e.message); }
+}
+function stopBatch(id){
+  if(confirm('停止后标注员将无法领取和提交该批次任务，确定停止？')) setStatus(id,'stopped');
+}
+async function releaseBatch(id){
+  if(!confirm('将该批次所有「已领取未提交」的组退回任务池（草稿会清空），确定？')) return;
+  try{ const r = await api('/api/admin/release',{method:'POST',body:JSON.stringify({batchId:id})}); toast('已释放 '+r.released+' 组'); refreshAll(); }
+  catch(e){ toast(e.message); }
+}
+// 删除批次（含所有任务和 Excel 行，不可恢复）
+async function deleteBatch(id, name, total, submitted){
+  // 第一次确认
+  const line1 = `确定要删除批次 #${id}「${name}」吗？`;
+  const line2 = total>0 ? `该批次共 ${total} 条任务，其中已提交 ${submitted} 条。` : '该批次下没有任何任务。';
+  const line3 = '此操作不可恢复，删除后所有对应的任务、Excel 行和标注数据都将被清除！';
+  if(!confirm(`${line1}\n\n${line2}\n${line3}\n\n继续请点「确定」`)) return;
+
+  // 第二次确认（输入批次名）
+  const expected = String(name || '').trim();
+  const prompt = expected
+    ? `请输入批次名称「${expected}」以确认删除：`
+    : `请输入批次 ID「${id}」以确认删除：`;
+  const typed = (window.prompt(prompt, '') || '').trim();
+  const ok2 = expected ? (typed === expected) : (typed === String(id));
+  if(!ok2){ toast('输入不匹配，已取消'); return; }
+
+  try{
+    const r = await api('/api/admin/batches/'+id, {method:'DELETE'});
+    toast(`已删除 #${id}「${r.name}」（${r.deletedTasks} 任务 / ${r.deletedExcelRows} Excel行）`);
+    refreshAll();
+  }catch(e){ toast(e.message); }
+}
+function exportBatch(id){
+  const sel = $('expSel'+id);
+  const filter = sel ? sel.value : 'all';
+  window.open(`/api/admin/export/${id}${filter && filter!=='all' ? '?filter='+filter : ''}`);
+}
+
+async function loadAnnotators(){
+  try{
+    const bid = $('fltBatch').value;
+    const list = await api('/api/admin/annotators'+(bid?'?batchId='+bid:''));
+    const body = $('annBody');
+    body.innerHTML = list.length ? '' : '<tr><td colspan="4" class="muted">暂无标注员数据</td></tr>';
+    for(const a of list){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><b>${a.assignee}</b></td><td>${a.claimed}</td><td style="color:var(--green)">${a.submitted}</td>
+        <td>
+          <button class="btn sm" ${a.claimed?'':'disabled'} onclick="releaseUser('${a.assignee}')">释放其未交组</button>
+          <button class="btn sm warn" ${a.claimed?'':'disabled'} onclick="reassignUser('${a.assignee}')">转派给…</button>
+        </td>`;
+      body.appendChild(tr);
+    }
+  }catch(e){ toast(e.message); }
+}
+
+async function releaseUser(name){
+  if(!confirm(`释放「${name}」所有已领取未提交的组？（草稿会清空）`)) return;
+  const bid = $('fltBatch').value;
+  try{ const r = await api('/api/admin/release',{method:'POST',body:JSON.stringify({assignee:name,batchId:bid||undefined})}); toast('已释放 '+r.released+' 组'); refreshAll(); }
+  catch(e){ toast(e.message); }
+}
+async function reassignUser(name){
+  const to = prompt(`将「${name}」的未提交组转派给（输入接收人姓名）：`);
+  if(!to || !to.trim()) return;
+  const bid = $('fltBatch').value;
+  try{ const r = await api('/api/admin/reassign',{method:'POST',body:JSON.stringify({from:name,to:to.trim(),batchId:bid||undefined})}); toast('已转派 '+r.reassigned+' 组给 '+to.trim()); refreshAll(); }
+  catch(e){ toast(e.message); }
+}
+
+function refreshAll(){ loadBatches(); loadAnnotators(); loadLabelStats(); loadSubmitted(); }
+
+/* ==================== 已提交数据查看 ==================== */
+let subPage = 1;
+const SUB_PAGE_SIZE = 20;
+
+async function loadSubmitted(){
+  try{
+    if(subPage < 1) subPage = 1;
+    const bid = $('subBatch').value;
+    const assignee = $('subAssignee').value.trim();
+    const kw = $('subKw').value.trim();
+    const q = new URLSearchParams({page: subPage, pageSize: SUB_PAGE_SIZE});
+    if(bid) q.set('batchId', bid);
+    if(assignee) q.set('assignee', assignee);
+    if(kw) q.set('kw', kw);
+    const d = await api('/api/admin/submitted?'+q.toString());
+    renderSubmitted(d);
+  }catch(e){ toast(e.message); }
+}
+
+function renderSubmitted(d){
+  const body = $('subBody');
+  body.innerHTML = d.rows.length ? '' : '<tr><td colspan="9" class="muted">暂无已提交数据</td></tr>';
+  for(const r of d.rows){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>#${r.id}</td>
+      <td class="muted">#${r.batch_id} ${r.batch_name||''}</td>
+      <td>${r.prospecting_id||'-'}</td>
+      <td>${r.cell_name||'-'}</td>
+      <td><a href="${imgProxyUrl(r.full_image_url)}" target="_blank" style="color:var(--primary)">查看图片 ↗</a></td>
+      <td><span class="c-red" style="font-weight:600">${r.yes}</span> / <span class="c-green" style="font-weight:600">${r.no}</span> / <span class="c-orange" style="font-weight:600">${r.na}</span></td>
+      <td><b>${r.assignee||'-'}</b></td>
+      <td class="muted">${r.submitted_at||'-'}</td>
+      <td><button class="btn sm" onclick="toggleSubDetail(this, ${r.id})">详情</button></td>`;
+    body.appendChild(tr);
+    // 详情行（默认隐藏）
+    const dtr = document.createElement('tr');
+    dtr.style.display = 'none';
+    dtr.dataset.detailFor = r.id;
+    let ansHtml = '';
+    for(const [k, v] of Object.entries(r.answers||{})){
+      const idx = k.indexOf('_');
+      const nm = idx>0 ? k.slice(idx+1) : k;
+      const cat = idx>0 ? k.slice(0,idx) : '';
+      const vc = v==='是'?'v-yes':(v==='否'?'v-no':'v-na');
+      ansHtml += `<span class="ans-item">${cat?'<span style="color:var(--primary);font-size:11px">['+cat+']</span>':''}${nm}<span class="av ${vc}">${v}</span></span>`;
+    }
+    dtr.innerHTML = `<td colspan="9"><div class="sub-detail">${ansHtml||'<span class="muted">无标注数据</span>'}` +
+      (r.remark ? `<div style="margin-top:6px;font-size:12px;color:var(--muted)">备注：${r.remark}</div>` : '') +
+      `</div></td>`;
+    body.appendChild(dtr);
+  }
+  const totalPages = Math.max(1, Math.ceil(d.total / d.pageSize));
+  $('subInfo').textContent = `共 ${d.total} 条 · 第 ${d.page}/${totalPages} 页`;
+  $('subPrev').disabled = d.page <= 1;
+  $('subNext').disabled = d.page >= totalPages;
+}
+
+function toggleSubDetail(btn, id){
+  const dtr = $('subBody').querySelector(`tr[data-detail-for="${id}"]`);
+  if(!dtr) return;
+  const show = dtr.style.display === 'none';
+  dtr.style.display = show ? '' : 'none';
+  btn.textContent = show ? '收起' : '详情';
+}
+
+/* ==================== 标签统计 ==================== */
+async function loadLabelStats(){
+  try{
+    const bid = $('statsBatch').value;
+    if(!bid){ $('statsOverview').innerHTML='<div class="muted" style="text-align:center;padding:20px">请先选择一个批次</div>'; $('statsDetail').innerHTML=''; return; }
+    const d = await api('/api/admin/label-stats/'+bid);
+    renderLabelStats(d);
+  }catch(e){ toast(e.message); }
+}
+
+function renderLabelStats(d){
+  const {totalSubmitted, labelColumns, stats} = d;
+  // 概览行：总组数 / 各状态汇总
+  const overview = $('statsOverview');
+  let totalYes=0, totalNo=0, totalNa=0;
+  for(const col of labelColumns){
+    totalYes += stats[col]['是'];
+    totalNo += stats[col]['否'];
+    totalNa += stats[col]['无法判断'];
+  }
+  overview.innerHTML = [
+    {num: d.totalSubmitted || 0, label:'已提交组数', cls:'c-gray'},
+    {num: totalYes, label:'「是」总计', cls:'c-red'},
+    {num: totalNo, label:'「否」总计', cls:'c-green'},
+    {num: totalNa, label:'「无法判断」总计', cls:'c-orange'},
+  ].map(s=>`<div class="stat-card"><div class="sc-num ${s.cls}">${s.num}</div><div class="sc-label">${s.label}</div></div>`).join('');
+
+  // 每个标签一行
+  const detail = $('statsDetail');
+  detail.innerHTML = '';
+  for(const col of labelColumns){
+    const s = stats[col];
+    const idx = col.indexOf('_');
+    const displayName = idx > 0 ? col.slice(idx+1) : col;
+    const cat = idx > 0 ? col.slice(0,idx) : '';
+    const row = document.createElement('div');
+    row.className = 'label-stat-row';
+    row.innerHTML =
+      `<div class="ls-name">${cat ? '<span style="color:var(--primary);font-size:11px;margin-right:4px">['+cat+']</span>':''}${displayName}</div>` +
+      `<div class="ls-item"><div class="ls-val c-red">${s['是']}</div><div class="ls-lbl">是</div></div>` +
+      `<div class="ls-item"><div class="ls-val c-green">${s['否']}</div><div class="ls-lbl">否</div></div>` +
+      `<div class="ls-item"><div class="ls-val c-orange">${s['无法判断']}</div><div class="ls-lbl">无法判断</div></div>`;
+    detail.appendChild(row);
+  }
+
+  // 同步批次下拉
+  const sel = $('statsBatch');
+  if(sel.options.length <= 1 && allBatchesAdmin?.length){
+    sel.innerHTML = '<option value="">选择批次...</option>' + allBatchesAdmin.map(b=>`<option value="${b.id}">#${b.id} ${b.name}</option>`).join('');
+    sel.value = bid;
+  }
+}
+
+// 记住管理端批次列表用于统计下拉
+let allBatchesAdmin = [];
+
+/* ===================== 图片缩放（滚轮+拖拽） ===================== */
+let imgScale = 1, imgX = 0, imgY = 0, isDragging = false, dragStart = {x:0,y:0};
+let imgRetryCount = 0;
+
+// 图片走服务端代理，避免浏览器直连图床被限流/防盗链
+function imgProxyUrl(u){
+  if(!u) return '';
+  return '/api/img?u=' + encodeURIComponent(u);
+}
+function onImgError(){
+  imgRetryCount++;
+  if(imgRetryCount <= 3){
+    // 自动退避重试
+    setTimeout(() => {
+      const img = $('mainImg');
+      if(curDetail) img.src = imgProxyUrl(curDetail.full_image_url) + '&r=' + imgRetryCount;
+    }, 800 * imgRetryCount);
+  } else {
+    // 重试耗尽：提示手动重试
+    if(!$('imgErrTip')){
+      const s = document.createElement('span');
+      s.id = 'imgErrTip';
+      s.style.cssText = 'color:#ff7a7a;margin-left:10px';
+      s.innerHTML = '图片加载失败，<a href="#" style="color:#7ea6f5" onclick="reloadImg();return false;">点击重试</a>';
+      $('imgInfo').appendChild(s);
+    }
+  }
+}
+function removeImgErrTip(){
+  const t = $('imgErrTip'); if(t) t.remove();
+}
+function reloadImg(){
+  imgRetryCount = 0; removeImgErrTip();
+  const img = $('mainImg');
+  if(curDetail) img.src = imgProxyUrl(curDetail.full_image_url) + '&r=' + Date.now();
+}
+
+function applyImgTransform(){
+  const img = $('mainImg');
+  if(!img) return;
+  img.style.transformOrigin = '0 0';
+  img.style.transform = `translate(${imgX}px, ${imgY}px) scale(${imgScale})`;
+  $('zoomPct').textContent = Math.round(imgScale * 100) + '%';
+}
+
+function imgZoom(action){
+  const box = $('imgBox');
+  const img = $('mainImg');
+  if(!box || !img) return;
+  const rect = box.getBoundingClientRect();
+  const cx = rect.width / 2, cy = rect.height / 2;
+  if(action === 'in'){
+    imgScale = Math.min(imgScale * 1.25, 20);
+    // 以图片中心为基准缩放
+    imgX = cx - (cx - imgX) * 1.25;
+    imgY = cy - (cy - imgY) * 1.25;
+  } else if(action === 'out'){
+    imgScale = Math.max(imgScale / 1.25, 0.1);
+    imgX = cx - (cx - imgX) / 1.25;
+    imgY = cy - (cy - imgY) / 1.25;
+    if(imgScale <= 1){ imgScale=1; imgX=0; imgY=0; }
+  } else if(action === 'reset'){
+    imgScale = 1; imgX = 0; imgY = 0;
+  }
+  applyImgTransform();
+}
+
+// 滚轮缩放
+$('imgBox')?.addEventListener('wheel', function(e){
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -1 : 1;
+  // 以鼠标位置为缩放中心
+  const rect = this.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const oldScale = imgScale;
+  const factor = delta > 0 ? 1.15 : 1/1.15;
+  imgScale = Math.max(0.1, Math.min(20, imgScale * factor));
+  // 调整偏移使鼠标下的点保持不动
+  imgX = mx - (mx - imgX) * (imgScale / oldScale);
+  imgY = my - (my - imgY) * (imgScale / oldScale);
+  if(imgScale <= 1){ imgScale=1; imgX=0; imgY=0; }
+  applyImgTransform();
+}, {passive: false});
+
+// 拖拽平移
+$('imgBox')?.addEventListener('mousedown', function(e){
+  if(e.target.tagName !== 'IMG' || imgScale <= 1) return;
+  isDragging = true;
+  dragStart = {x: e.clientX - imgX, y: e.clientY - imgY};
+  e.preventDefault();
+});
+document.addEventListener('mousemove', function(e){
+  if(!isDragging) return;
+  imgX = e.clientX - dragStart.x;
+  imgY = e.clientY - dragStart.y;
+  applyImgTransform();
+});
+document.addEventListener('mouseup', function(){ isDragging = false; });
+
+// 双击重置
+$('mainImg')?.addEventListener('dblclick', function(e){
+  e.preventDefault();
+  imgZoom('reset');
+});
+
+/* ===================== 初始化 ===================== */
+window.addEventListener('beforeunload', ()=>{ if(dirty) flushDraft(); });
+initUser();
+setInterval(()=>{ if(currentTab==='adm') refreshAll(); }, 30000);
+</script>
+</body>
+</html>
